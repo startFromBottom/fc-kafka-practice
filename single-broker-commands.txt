@@ -1,0 +1,126 @@
+$ docker-compose up -d 
+
+#####################
+### topic cli 실습 ###
+#####################
+
+// topic 생성
+$ docker-compose exec kafka kafka-topics --create --topic first_topic --bootstrap-server kafka:9092 
+$ docker-compose exec kafka kafka-topics --create --topic second_topic --bootstrap-server kafka:9092 --partitions 3 
+$ docker-compose exec kafka kafka-topics --create --topic third_topic --bootstrap-server kafka:9092 --partitions 3 --replication-factor 2
+
+$ docker-compose exec kafka kafka-topics --create --topic third_topic --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1
+
+// topic 리스트 확인
+$ docker-compose exec kafka kafka-topics --list --bootstrap-server kafka:9092
+
+// 각 topic의 상세 설명
+$ docker-compose exec kafka kafka-topics --describe --topic first_topic --bootstrap-server kafka:9092
+
+// topic 삭제
+$ docker-compose exec kafka kafka-topics --delete --topic first_topic --bootstrap-server kafka:9092
+
+
+
+########################
+### producer cli 실습 ###
+########################
+
+
+// topic 재생성
+$ docker-compose exec kafka kafka-topics --create --topic first_topic --bootstrap-server kafka:9092 
+$ docker-compose exec kafka bash
+
+// producer 생성
+$ kafka-console-producer --topic first_topic --broker-list kafka:9092
+
+$ kafka-console-producer --topic first_topic --broker-list kafka:9092 --producer-property acks=all
+
+// 없는 topic에 producer 생성?
+$ kafka-console-producer --topic new_topic --broker-list kafka:9092
+
+// producer with keys
+$ kafka-console-producer --topic first_topic --broker-list kafka:9092 --property parse.key=true --property key.separator=:
+
+
+########################
+### consumer cli 실습 ###
+########################
+
+// 토픽 생성
+$ docker-compose exec kafka kafka-topics --bootstrap-server localhost:9092 --topic second_topic --create --partitions 3
+
+$ docker-compose exec kafka bash
+// consumer
+$ kafka-console-consumer --bootstrap-server localhost:9092 --topic second_topic
+
+// 다른 터미널 열기
+$ docker-compose exec kafka bash
+// producer 생성
+// RoundRobinPartitioner : 실무에선 사용 X, 동작 방식 확인용
+$ kafka-console-producer --bootstrap-server localhost:9092 --producer-property partitioner.class=org.apache.kafka.clients.producer.RoundRobinPartitioner --topic second_topic
+// producer에 string을 추가하면, consumer에서 잘 보이는 것을 확인.
+
+// consumer 종료 후 다시 띄우기
+
+
+// from beginning.
+// producer에서 전송한 순서대로 데이터가 보이지는 않음.
+$ kafka-console-consumer --bootstrap-server localhost:9092 --topic second_topic --from-beginning
+
+
+// key, value, timestamp 출력
+$ kafka-console-consumer --bootstrap-server localhost:9092 --topic second_topic --formatter kafka.tools.DefaultMessageFormatter --property print.timestamp=true --property print.key=true --property print.value=true --property print.partition=true --from-beginning
+
+#############################
+### Consumer groups 실습 1 ###
+#############################
+
+
+// topic 생성 (partition 3개)
+
+$ docker-compose exec kafka kafka-topics --create --topic third_topic --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1
+
+$ docker-compose exec kafka bash
+
+// consumer 1
+$ kafka-console-consumer --bootstrap-server localhost:9092 --topic third_topic --group my-first-application
+
+// producer
+$ kafka-console-producer --bootstrap-server localhost:9092 --producer-property partitioner.class=org.apache.kafka.clients.producer.RoundRobinPartitioner --topic third_topic
+
+// consumer 2
+$ kafka-console-consumer --bootstrap-server localhost:9092 --topic third_topic --group my-first-application
+
+// consumer 3
+$ kafka-console-consumer --bootstrap-server localhost:9092 --topic third_topic --group my-first-application
+
+// consumer 4
+// partition 개수보다 consumer 개수가 더 많으면, 1개 이상의 conusmer는 데이터를 아예 못 받을 수도 있음.
+$ kafka-console-consumer --bootstrap-server localhost:9092 --topic third_topic --group my-first-application
+
+
+// consumer 5 (other group)
+$ kafka-console-consumer --bootstrap-server localhost:9092 --topic third_topic --group my-second-application --from-beginning
+
+// 같은 명령어를 한 번 더 입력하면, 아무 것도 보이지 않음.
+// --from-beginning : consumer_offset 이 없을 때만 유효하게 동작함.
+$ kafka-console-consumer --bootstrap-server localhost:9092 --topic third_topic --group my-second-application --from-beginning
+
+
+
+
+#############################
+### Consumer groups 실습 2 ###
+#############################
+
+
+# consumer groups 리스트 
+$ kafka-consumer-groups --bootstrap-server localhost:9092 --list
+ 
+# 특정 consumer-group 정보 확인
+$ kafka-consumer-groups --bootstrap-server localhost:9092 --describe --group my-second-application
+
+# producer & consumer 재실행
+$ kafka-console-producer --bootstrap-server localhost:9092 --producer-property partitioner.class=org.apache.kafka.clients.producer.RoundRobinPartitioner --topic third_topic
+$ kafka-console-consumer --bootstrap-server localhost:9092 --topic third_topic --group my-second-application --from-beginning
